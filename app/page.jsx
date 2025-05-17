@@ -1,8 +1,8 @@
-
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import html2pdf from "html2pdf.js";
+// Remove the direct import
+// import html2pdf from "html2pdf.js";
 
 export default function TestPage() {
   // State variables remain the same
@@ -21,6 +21,8 @@ export default function TestPage() {
   const [showWarning, setShowWarning] = useState(false);
   const [warningMessage, setWarningMessage] = useState("");
   const [submissionError, setSubmissionError] = useState(null);
+  // Add state for html2pdf library
+  const [html2pdfLib, setHtml2pdfLib] = useState(null);
 
   const pdfRef = useRef(null);
   const router = useRouter();
@@ -94,6 +96,20 @@ export default function TestPage() {
       type: "shortText",
     },
   ];
+
+  // Load html2pdf library on client-side only
+  useEffect(() => {
+    // Only import html2pdf in the browser
+    if (typeof window !== 'undefined') {
+      import('html2pdf.js')
+        .then((module) => {
+          setHtml2pdfLib(() => module.default);
+        })
+        .catch(error => {
+          console.error("Failed to load html2pdf:", error);
+        });
+    }
+  }, []);
 
   useEffect(() => {
     const initialAnswers = {};
@@ -311,6 +327,11 @@ export default function TestPage() {
 
   // Generate PDF of answers
   const generatePDF = () => {
+    if (!html2pdfLib) {
+      console.error("html2pdf library not loaded");
+      return Promise.reject(new Error("PDF library not loaded"));
+    }
+
     const element = pdfRef.current;
     const opt = {
       margin: 10,
@@ -320,7 +341,7 @@ export default function TestPage() {
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
     };
 
-    return html2pdf().set(opt).from(element).save();
+    return html2pdfLib().set(opt).from(element).save();
   };
 
   // Submit the test
@@ -357,6 +378,11 @@ export default function TestPage() {
     console.log("Submitting analytics:", analyticsPayload);
 
     try {
+      // Check if PDF library is loaded
+      if (!html2pdfLib) {
+        throw new Error("PDF generation library not loaded");
+      }
+      
       // Generate PDF first
       await generatePDF();
 
@@ -578,8 +604,9 @@ export default function TestPage() {
         <button
           className="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 transition text-lg font-medium"
           onClick={() => handleSubmit()}
+          disabled={!html2pdfLib}
         >
-          Submit Test and Generate PDF
+          {html2pdfLib ? "Submit Test and Generate PDF" : "Loading PDF Generator..."}
         </button>
       </div>
     </div>
